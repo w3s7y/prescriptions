@@ -1,2 +1,5 @@
 *.csv
-venv/
+*.CSV
+.idea
+venv
+__pycache__
