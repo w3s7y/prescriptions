@@ -66,9 +66,9 @@ class data_transformer:
 
 class data_loader:
     """The 'L' in ETL"""
-    def __init__(self, db_username, db_password, db_name, db_schema, transformer):
+    def __init__(self, db_host, db_username, db_password, db_name, db_schema, transformer):
         self.db_engine = sqlalchemy.create_engine(
-            'postgresql+psycopg2://{}:{}@192.168.33.122/{}'.format(db_username, db_password, db_name))
+            'postgresql+psycopg2://{}:{}@{}/{}'.format(db_username, db_password, db_host, db_name))
         self.transformer = transformer
         self.schema = db_schema
 
@@ -98,17 +98,18 @@ class etl_controller:
         google_token = os.environ.get('GOOGLE_API_TOKEN')
 
         # Vars for the loader
-        db_user = 'ubuntu'
-        db_pass = '1234qwer'
-        db_name = 'test'
-        db_scheeema = 'prescriptions'
+        db_user = os.environ.get('DB_USER')
+        db_pass = os.environ.get('DB_PASS')
+        db_host = os.environ.get('DB_HOST')
+        db_name = os.environ.get('DB_NAME')
+        db_schema = os.environ.get('DB_SCHEMA')
 
         # Create the ETL objects.
         self.extractor = data_extractor(gp_addresses, prescriptions_data, drug_substitutions)
         self.transformer = data_transformer(google_token, self.extractor)
-        self.loader = data_loader(db_user, db_pass, db_name, db_scheeema, self.transformer)
+        self.loader = data_loader(db_host, db_user, db_pass, db_name, db_schema, self.transformer)
 
 
-# Main run code (stops the code smashing the disk & loading ~1.5Gb into memory)
+# Main run code
 if __name__ == '__main__':
     print('This is not designed to be ran from the command line, only imported into other modules.')
