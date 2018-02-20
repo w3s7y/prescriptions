@@ -78,7 +78,7 @@ class data_loader:
                 table_name, self.db_engine, schema=self.schema, if_exists='replace')
         elif table_name == 'scripts':
             self.transformer.transform_and_enrich_prescriptions().to_sql(
-                table_name, self.db_engine, schema=self.schema, if_exists='replace', chunksize=100000)
+                table_name, self.db_engine, schema=self.schema, if_exists='replace', chunksize=10000)
         elif table_name == 'subs':
             self.transformer.transform_and_enrich_subs().to_sql(
                 table_name, self.db_engine, schema=self.schema, if_exists='replace')
