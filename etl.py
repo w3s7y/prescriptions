@@ -3,87 +3,54 @@ import os
 import sqlalchemy
 import googlemaps
 import pandas
+import logging
+
+logger = logging.getLogger(__name__)
+handle = logging.FileHandler('prescriptions.log')
+handle.setLevel(logging.DEBUG)
+logger.addHandler(handle)
 
 
-class haz_bad_data_load_exception(Exception):
-    pass
-
-
-class data_extractor:
-    """The 'E' in ETL.
-    Opens the file handles and makes the raw CSV payload available to transform."""
-
-    def __init__(self, gp_address_file, prescriptions_file, drug_subs_file):
-        self.addresses = pandas.read_csv(open(gp_address_file, 'r'))
-        self.prescriptions = pandas.read_csv(open(prescriptions_file, 'r'))
-        self.chem_subs = pandas.read_csv(open(drug_subs_file, 'r'))
-
-
-class data_transformer:
-    """The 'T' in ETL (Also another 'E' for Enrichment?)"""
-
-    def __init__(self, google_api_token, extractor):
-        self.gmaps = googlemaps.Client(key=google_api_token)
-        self.extractor = extractor
-
-    def transform_and_enrich_addresses(self):
-        addrs = self.extractor.addresses  # Pandas DataFrame object
-
-        # Strip off the 'yrmon' column (it's GARRRBAGGE)
-        addrs = addrs.drop(columns=['yrmon'])
-
-        # str.strip(), str.lower() and str.capitalize() address fields.
-        for field in ['practice_name', 'address_1', 'address_2', 'address_3', 'address_4']:
-            addrs[field] = addrs[field].map(lambda x: x.strip().lower().capitalize())
-
-        # TODO Adding 2 new fields 'latitude' and 'longitude' gathered from google geolocation API
-
-        return addrs
-
-    def transform_and_enrich_prescriptions(self):
-        scripts = self.extractor.prescriptions
-
-        # cut crap columns off
-        scripts = scripts.drop(columns=['period', 'blank'])
-
-        # Strip whitespace off text cols
-        for field in ['drug_name']:
-            scripts[field] = scripts[field].map(lambda x: x.strip())
-
-        return scripts
-
-    def transform_and_enrich_subs(self):
-        subs = self.extractor.chem_subs
-
-        # Drop the blank column off the end
-        subs = subs.drop(columns=['blank'])
-
-        # Strip the fields of whitespace
-        for field in ['chemical_code', 'chemical_name']:
-            subs[field] = subs[field].map(lambda x: x.strip())
-
-        return subs
-
-class data_loader:
-    """The 'L' in ETL"""
-    def __init__(self, db_host, db_username, db_password, db_name, db_schema, transformer):
+class EtlPipeline:
+    def __init__(self, gp_address_file, prescriptions_file, drug_subs_file, chunk_size, google_token,
+                 db_host, db_username, db_password, db_name, db_schema):
         self.db_engine = sqlalchemy.create_engine(
             'postgresql+psycopg2://{}:{}@{}/{}'.format(db_username, db_password, db_host, db_name))
-        self.transformer = transformer
         self.schema = db_schema
+        self.gmaps = googlemaps.Client(key=google_token)
 
-    def load(self, table_name):
-        if table_name == 'addresses':
-            self.transformer.transform_and_enrich_addresses().to_sql(
-                table_name, self.db_engine, schema=self.schema, if_exists='replace')
-        elif table_name == 'scripts':
-            self.transformer.transform_and_enrich_prescriptions().to_sql(
-                table_name, self.db_engine, schema=self.schema, if_exists='replace', chunksize=10000)
-        elif table_name == 'subs':
-            self.transformer.transform_and_enrich_subs().to_sql(
-                table_name, self.db_engine, schema=self.schema, if_exists='replace')
-        else:
-            raise haz_bad_data_load_exception
+        self.addresses = pandas.read_csv(open(gp_address_file, 'r'), chunksize=chunk_size)
+        self.prescriptions = pandas.read_csv(open(prescriptions_file, 'r'), chunksize=chunk_size)
+        self.substitutions = pandas.read_csv(open(drug_subs_file, 'r'), chunksize=chunk_size)
+
+    def transform_and_load_addresses(self):
+        logger.info('Running address transform.')
+        for chunk in self.addresses:
+            chunk = chunk.drop(columns=['yrmon'])
+            for field in ['practice_name', 'address_1', 'address_2', 'address_3', 'address_4']:
+                chunk[field] = chunk[field].map(lambda x: x.strip().lower().capitalize())
+
+            # TODO Adding 2 new fields 'latitude' and 'longitude' gathered from google geo location API
+            self.load('addresses', chunk)
+
+    def transform_and_load_prescriptions(self):
+        for chunk in self.prescriptions:
+            chunk = chunk.drop(columns=['period', 'blank'])
+            for field in ['drug_name']:
+                chunk[field] = chunk[field].map(lambda x: x.strip())
+            self.load('prescriptions', chunk)
+
+    def transform_and_load_subs(self):
+        for chunk in self.substitutions:
+            chunk = chunk.drop(columns=['blank'])
+            for field in ['chemical_code', 'chemical_name']:
+                chunk[field] = chunk[field].map(lambda x: x.strip())
+            self.load('substitutions', chunk)
+
+    def load(self, table, chunk):
+        chunk.to_sql(
+            table, self.db_engine, schema=self.schema, if_exists='append')
+
 
 class etl_controller:
     """Defaults and stuff, basic logic control."""
@@ -93,23 +60,22 @@ class etl_controller:
         gp_addresses = 'T201710ADDR+BNFT.CSV'
         prescriptions_data = 'T201710PDPI+BNFT.CSV'
         drug_substitutions = 'T201710CHEM+SUBS.CSV'
+        chunk_size = 1000
 
         # Vars for the data transformer & enrichment
         google_token = os.environ.get('GOOGLE_API_TOKEN')
 
         # Vars for the loader
-        db_user = os.environ.get('DB_USER')
-        db_pass = os.environ.get('DB_PASS')
-        db_host = os.environ.get('DB_HOST')
-        db_name = os.environ.get('DB_NAME')
-        db_schema = os.environ.get('DB_SCHEMA')
+        db_user = os.environ.get('DB_USER', default='ubuntu')
+        db_pass = os.environ.get('DB_PASS', default='1234qwer')
+        db_host = os.environ.get('DB_HOST', default='192.168.33.122')
+        db_name = os.environ.get('DB_NAME', default='test')
+        db_schema = os.environ.get('DB_SCHEMA', default='prescriptions')
+        # Create the pipeline object.
+        self.pipeline = EtlPipeline(gp_addresses, prescriptions_data, drug_substitutions, chunk_size, google_token,
+                                    db_host, db_user, db_pass, db_name, db_schema)
 
-        # Create the ETL objects.
-        self.extractor = data_extractor(gp_addresses, prescriptions_data, drug_substitutions)
-        self.transformer = data_transformer(google_token, self.extractor)
-        self.loader = data_loader(db_host, db_user, db_pass, db_name, db_schema, self.transformer)
-
-
-# Main run code
-if __name__ == '__main__':
-    print('This is not designed to be ran from the command line, only imported into other modules.')
+    def run_pipe(self):
+        self.pipeline.transform_and_load_addresses()
+        self.pipeline.transform_and_load_prescriptions()
+        self.pipeline.transform_and_load_subs()

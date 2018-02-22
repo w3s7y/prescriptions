@@ -3,3 +3,5 @@
 .idea
 venv
 __pycache__
+prescription_stats.profile
+prescriptions.log

@@ -12,7 +12,6 @@ the data with latitude and longitude coordinates based on the GPs address to enh
 the accuracy of correlations (see Goals / objectives). 
 
 ## Goals / objectives
-
 This project aims to answer the following basic questions using a mixture of statistics 
 and machine learning models:
 
@@ -26,20 +25,17 @@ and machine learning models:
 We can add more groups, but I think 5 is a good starter for ten to see what is possible. 
 
 ###### Are there any GPs that over prescribe certain medicines?
-
 * What is the average amount of antibiotics prescribed by a practice?
 * How does that compare to other practices in the same area? 
 * Are there any practices in the UK which _really_ overdo it prescribing _X_?
 
 ###### Could we predict where and what type of medicine is prescribed in the UK at what time of the year?
-
 This could be used by the NHS for things like stock control and distribution of drugs and ensuring 
-areas have the drugs that practices are expected to prescribe in the following months for e.g.
+pharmacies have the drugs that practices are expected to prescribe in the following months for e.g.
 
 ###### Your question for the data here...
 
 ## Running the project
-
 At a High-Level
 
 * Goto the above mentioned site and download a dataset (they come in month-by-month csv format)
@@ -49,3 +45,4 @@ At a High-Level
 * Run the statistics module, look at the results...
 * Run the ml module to train models and persist trained models in the DB for later use.
 * When new datasets are produced at source, use models to predict future prescriptions.
+
