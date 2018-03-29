@@ -1,0 +1,60 @@
+rescource_types:
+- name: file
+  type: docker-image
+  source: { repository: alpine }
+
+resources:
+- name: gp-address-data
+  type: file
+  source:
+    path: /gp-address-data.csv
+
+- name: prescriptions-database
+  type: docker-image
+  source:
+    repository: postgres
+    tag: 9.6
+    params:
+      POSTGRES_DB: prescriptions
+      POSTGRES_USER: prescriptions
+      POSTGRES_PASSWORD: prescriptions
+      PGDATA: /prescriptions
+
+- name: prescriptions-repo
+  type: git
+  source:
+    uri: https://github.com/w3s7y/prescriptions.git
+    branch: master
+
+- name: prescriptions-runner
+  type: docker-image
+  source:
+    repository: prescriptions-runner
+    tag: build
+
+
+jobs:
+- name: build-prescriptions-runner
+  plan:
+  - get: prescriptions-repo
+    trigger: true
+  - put: prescriptions-runner
+    params:
+      build: prescriptions-repo
+
+- name: load-address-data
+  plan:
+  - get: prescriptions-database
+  - get: prescriptions-repo
+    trigger: true
+  - get: gp-address-data
+  - task: load-address-data
+    config:
+      inputs:
+      - name: prescriptions-runner
+      - name: prescriptions-repo
+      platform: linux
+      run:
+        path: python prescriptions
+      image_resource:
+        type: prescriptions-runner
