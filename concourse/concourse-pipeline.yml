@@ -1,0 +1,65 @@
+resources:
+- name: prescriptions-repo
+  type: git
+  source:
+    uri: https://github.com/w3s7y/prescriptions.git
+    branch: master
+
+- name: prescriptions-runner
+  type: docker-image
+  source:
+    repository: 172.17.0.1:5000/prescriptions-runner
+    tag: build
+    insecure_registries: [ "172.17.0.1:5000" ]
+
+- name: file-resource
+  type: docker-image
+  source:
+    repository: 172.17.0.1:5000/file-resource
+    tag: build
+    insecure_registries: [ "172.17.0.1:5000" ]
+
+
+jobs:
+- name: build-prescriptions-runner
+  build_logs_to_retain: 5
+  plan:
+  - get: prescriptions-repo
+    trigger: true
+  - put: prescriptions-runner
+    params:
+      build: prescriptions-repo
+- name: build-file-resource
+  build_logs_to_retain: 5
+  plan:
+  - get: prescriptions-repo
+    trigger: true
+  - put: file-resource
+    params:
+      build: prescriptions-repo/concourse/file-resource
+
+- name: load-address-data
+  build_logs_to_retain: 5
+  plan:
+  - get: prescriptions-repo
+  - get: prescriptions-runner
+  - task: load-address-data-task
+    config:
+      platform: linux
+      inputs:
+      - name: prescriptions-repo
+      run:
+        path: python
+        args: [ "prescriptions-repo/etl.py" ]
+      params:
+        DB_USER: prescriptions
+        DB_PASS: 1234qwer
+        DB_HOST: 172.17.0.1:7000
+        PRESCRIPTIONS_FILE:
+        SUBS_FILE:
+      image_resource:
+        type: docker-image
+        source:
+          repository: "172.17.0.1:5000/prescriptions-runner"
+          insecure_registries: [ "172.17.0.1:5000" ]
+          tag: build
