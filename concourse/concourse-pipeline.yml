@@ -37,10 +37,10 @@ jobs:
   build_logs_to_retain: 5
   plan:
   - get: prescriptions-repo
-    trigger: true
   - put: prescriptions-runner
     params:
       build: prescriptions-repo
+
 - name: build-file-resource
   build_logs_to_retain: 5
   plan:
