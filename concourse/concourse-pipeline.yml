@@ -1,3 +1,11 @@
+resource_types:
+- name: file
+  type: docker-image
+  source:
+    repository: 172.17.0.1:5000/file-resource
+    tag: build
+    insexure_registries: [ "172.17.0.1:5000" ]
+
 resources:
 - name: prescriptions-repo
   type: git
@@ -19,6 +27,10 @@ resources:
     tag: build
     insecure_registries: [ "172.17.0.1:5000" ]
 
+- name: address-data
+  type: file
+  source:
+    url: http://datagov.ic.nhs.uk/presentation/2017_10_October/T201710ADDR+BNFT.CSV
 
 jobs:
 - name: build-prescriptions-runner
@@ -43,11 +55,13 @@ jobs:
   plan:
   - get: prescriptions-repo
   - get: prescriptions-runner
+  - get: data-bundle
   - task: load-address-data-task
     config:
       platform: linux
       inputs:
       - name: prescriptions-repo
+      - name: data-bundle
       run:
         path: python
         args: [ "prescriptions-repo/etl.py" ]
