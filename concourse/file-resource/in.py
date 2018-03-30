@@ -26,5 +26,5 @@ out.close()
 
 response = {"version": hash_ver}
 
-print(response)
+print('{}'.format(response))
 sys.exit(0)

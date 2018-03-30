@@ -54,14 +54,13 @@ jobs:
   build_logs_to_retain: 5
   plan:
   - get: prescriptions-repo
-  - get: prescriptions-runner
-  - get: data-bundle
+  - get: address-data
   - task: load-address-data-task
     config:
       platform: linux
       inputs:
       - name: prescriptions-repo
-      - name: data-bundle
+      - name: address-data
       run:
         path: python
         args: [ "prescriptions-repo/etl.py" ]
@@ -69,8 +68,6 @@ jobs:
         DB_USER: prescriptions
         DB_PASS: 1234qwer
         DB_HOST: 172.17.0.1:7000
-        PRESCRIPTIONS_FILE:
-        SUBS_FILE:
       image_resource:
         type: docker-image
         source:
