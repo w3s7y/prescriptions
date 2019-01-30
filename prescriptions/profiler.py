@@ -1,5 +1,4 @@
 import cProfile
-import etl
 import pstats
 import timeit
 

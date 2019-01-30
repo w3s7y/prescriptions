@@ -1,6 +1,7 @@
 certifi
 chardet
 elasticsearch
+python-logstash
 idna
 numpy
 pandas

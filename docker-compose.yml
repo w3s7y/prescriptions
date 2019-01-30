@@ -1,0 +1,47 @@
+version: '3'
+services:
+  elasticsearch:
+    image: elasticsearch:6.5.4
+    volumes:
+      - "elastic_data:/var/lib/elasticsearch"
+    ports:
+      - 9200
+      - 9300
+  logstash:
+    image: logstash:6.5.4
+    volumes:
+      - "./config/logstash:/usr/share/logstash/pipeline"
+    ports:
+      - 9600
+      - 5044
+    depends_on:
+      - elasticsearch
+  kibana:
+    image: kibana:6.5.4
+    ports:
+      - 5601
+    depends_on:
+      - elasticsearch
+  postgres:
+    image: postgres:10.5-alpine
+    volumes:
+      - "postgres_data:/var/lib/postgresql/data"
+    ports:
+      - 5432
+    environment:
+      POSTGRES_PASSWORD: 'password'
+  prescriptions:
+    build:
+      context: ./
+      dockerfile: ./Dockerfile
+    image: prescriptions:latest
+    volumes:
+      - "~/PycharmProjects/prescription_data:/data"
+      - ".:/code"
+    depends_on:
+      - elasticsearch
+      - logstash
+      - postgres
+volumes:
+  elastic_data:
+  postgres_data:
